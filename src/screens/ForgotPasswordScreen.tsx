@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Alert,
 } from 'react-native';
 
@@ -12,31 +11,25 @@ import { Button } from '../components/Button';
 import { colors } from '../styles/colors';
 import { useAuthStore } from '../store/useAuthStore';
 
-export function RegisterScreen({ navigation }: any) {
-  const [name, setName] = useState('');
+export function ForgotPasswordScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const register = useAuthStore((s) => s.register);
+  const forgotPassword = useAuthStore((state) => state.forgotPassword);
 
-  async function handleRegister() {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert('Atenção', 'Preencha todos os campos');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Atenção', 'A senha deve ter pelo menos 6 caracteres');
+  async function handleReset() {
+    if (!email.trim()) {
+      Alert.alert('Atenção', 'Informe seu e-mail');
       return;
     }
 
     try {
       setLoading(true);
-      await register(name.trim(), email.trim(), password);
-      Alert.alert('Sucesso', 'Conta criada com sucesso!');
-      navigation.goBack();
+      await forgotPassword(email.trim());
+      Alert.alert('Sucesso', 'Instruções enviadas para seu e-mail', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
     } catch (error: any) {
-      Alert.alert('Erro', error.message || 'Erro ao criar conta');
+      Alert.alert('Erro', error.message || 'E-mail não encontrado');
     } finally {
       setLoading(false);
     }
@@ -44,17 +37,12 @@ export function RegisterScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Criar conta</Text>
-      <Text style={styles.subtitle}>Comece a construir seus hábitos</Text>
+      <Text style={styles.title}>Recuperar senha</Text>
+      <Text style={styles.subtitle}>
+        Informe seu e-mail e enviaremos instruções para redefinir sua senha
+      </Text>
 
       <View style={styles.form}>
-        <Input
-          placeholder="Nome"
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="words"
-        />
-
         <Input
           placeholder="Email"
           value={email}
@@ -63,21 +51,14 @@ export function RegisterScreen({ navigation }: any) {
           autoCapitalize="none"
         />
 
-        <Input
-          placeholder="Senha"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
         <Button
-          title="Cadastrar"
-          onPress={handleRegister}
+          title="Enviar instruções"
+          onPress={handleReset}
           loading={loading}
         />
 
         <Button
-          title="Já tenho conta"
+          title="Voltar ao login"
           onPress={() => navigation.goBack()}
           variant="secondary"
         />
@@ -104,6 +85,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: colors.textSecondary,
+    lineHeight: 24,
     marginBottom: 32,
   },
 
