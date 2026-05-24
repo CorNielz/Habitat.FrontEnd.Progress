@@ -25,6 +25,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "72ea688f-ddcc-4ad5-b6c3-1063b48c9d56"
+      }
+    },
+    "owner": "pedrog"
   }
 }
