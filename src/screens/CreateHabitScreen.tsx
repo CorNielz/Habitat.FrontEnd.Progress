@@ -16,6 +16,18 @@ import { Input } from '../components/Input';
 import { useHabitsStore } from '../store/useHabitsStore';
 import { useAuthStore } from '../store/useAuthStore';
 
+function parseLocalDate(iso: string) {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatLocalIso(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 const FREQUENCIES = [
   { value: 'single', label: 'Único' },
   { value: 'daily', label: 'Diário' },
@@ -23,7 +35,7 @@ const FREQUENCIES = [
   { value: 'monthly', label: 'Mensal' },
 ] as const;
 
-export function CreateHabitScreen({ navigation }: any) {
+export function CreateHabitScreen({ navigation, route }: any) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [frequency, setFrequency] = useState<'single' | 'daily' | 'weekly' | 'monthly'>('single');
@@ -31,6 +43,7 @@ export function CreateHabitScreen({ navigation }: any) {
 
   const addHabit = useHabitsStore((s) => s.addHabit);
   const user = useAuthStore((s) => s.user);
+  const createdAtParam = route?.params?.createdAt;
 
   function handleSave() {
     if (!title.trim()) {
@@ -41,7 +54,7 @@ export function CreateHabitScreen({ navigation }: any) {
     setLoading(true);
     setTimeout(() => {
       const now = new Date();
-      const createdAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const createdAt = createdAtParam ? formatLocalIso(parseLocalDate(createdAtParam)) : formatLocalIso(now);
 
       addHabit({
         id: String(Date.now()),

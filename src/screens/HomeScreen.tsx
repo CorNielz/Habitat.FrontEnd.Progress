@@ -296,6 +296,30 @@ export function HomeScreen({ navigation }: any) {
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalActionButton, styles.modalActionSecondary]}
+                    onPress={() => {
+                      setModalVisible(false);
+                      navigation.getParent()?.navigate('CreateNote', { linkedDate: selectedDate });
+                    }}
+                  >
+                    <Ionicons name="document-text" size={18} color={colors.primary} />
+                    <Text style={styles.modalActionSecondaryText}>Criar nota</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modalActionButton, styles.modalActionPrimary]}
+                    onPress={() => {
+                      setModalVisible(false);
+                      navigation.getParent()?.navigate('CreateHabit', { createdAt: selectedDate });
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={18} color="#FFF" />
+                    <Text style={styles.modalActionPrimaryText}>Criar hábito</Text>
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
             </View>
           </View>
@@ -407,5 +431,34 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F3F1',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  modalActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  modalActionSecondary: {
+    backgroundColor: '#EEF5EF',
+  },
+  modalActionPrimary: {
+    backgroundColor: colors.primary,
+  },
+  modalActionSecondaryText: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  modalActionPrimaryText: {
+    color: '#FFF',
+    fontWeight: '700',
   },
 });

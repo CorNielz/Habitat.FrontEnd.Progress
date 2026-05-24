@@ -13,11 +13,21 @@ import { colors } from '../styles/colors';
 import { useNotesStore } from '../store/useNotesStore';
 import { useAuthStore } from '../store/useAuthStore';
 
-export function CreateNoteScreen({ navigation }: any) {
+function parseLocalDate(iso: string) {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatPtBrFromIso(iso: string) {
+  return parseLocalDate(iso).toLocaleDateString('pt-BR');
+}
+
+export function CreateNoteScreen({ navigation, route }: any) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const addNote = useNotesStore((s) => s.addNote);
   const user = useAuthStore((s) => s.user);
+  const linkedDate = route?.params?.linkedDate;
 
   function handleSave() {
     if (!title.trim()) {
@@ -26,8 +36,8 @@ export function CreateNoteScreen({ navigation }: any) {
     }
 
     const now = new Date();
-    const createdAt = now.toLocaleDateString('pt-BR');
-    const linkedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const selectedDate = linkedDate || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const createdAt = formatPtBrFromIso(selectedDate);
 
     addNote({
       id: String(Date.now()),
@@ -37,7 +47,7 @@ export function CreateNoteScreen({ navigation }: any) {
       updatedAt: createdAt,
       favorite: false,
       userId: user?.id || '',
-      linkedDate,
+      linkedDate: selectedDate,
     });
 
     navigation.goBack();
