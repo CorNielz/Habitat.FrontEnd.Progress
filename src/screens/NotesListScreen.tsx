@@ -21,6 +21,13 @@ export function NotesListScreen({ navigation }: any) {
   const toggleFavorite = useNotesStore((state) => state.toggleFavorite);
   const [search, setSearch] = useState('');
 
+  function localIso(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   useEffect(() => {
     loadNotes();
   }, []);
@@ -38,7 +45,7 @@ export function NotesListScreen({ navigation }: any) {
       <View style={styles.header}>
         <Text style={styles.title}>Anotações</Text>
 
-        <TouchableOpacity onPress={() => navigation.getParent()?.navigate('CreateNote')}>
+        <TouchableOpacity onPress={() => navigation.getParent()?.navigate('CreateNote', { linkedDate: localIso(new Date()) })}>
           <Ionicons name="add-circle" size={32} color={colors.primary} />
         </TouchableOpacity>
       </View>

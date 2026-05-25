@@ -20,6 +20,7 @@ import { useMemo } from 'react';
 export function HomeScreen({ navigation }: any) {
   const user = useAuthStore((s) => s.user);
   const habits = useHabitsStore((s) => s.habits);
+  const getTodayProgress = useHabitsStore((s) => s.getTodayProgress);
   const notes = useNotesStore((s) => s.notes);
 
   function localIso(d: Date) {
@@ -30,9 +31,9 @@ export function HomeScreen({ navigation }: any) {
   }
 
   const today = localIso(new Date());
-  const completedToday = habits.filter((h) =>
-    h.completedDates.includes(today)
-  ).length;
+  const todayProgress = getTodayProgress();
+  const completedToday = todayProgress.completed;
+  const dueToday = todayProgress.total;
   const totalHabits = habits.length;
   const streak = habits.reduce((max, h) => {
     let count = 0;
@@ -167,7 +168,7 @@ export function HomeScreen({ navigation }: any) {
       <View style={styles.cards}>
         <View style={styles.card}>
           <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
-          <Text style={styles.cardNumber}>{completedToday}/{totalHabits}</Text>
+          <Text style={styles.cardNumber}>{completedToday}/{dueToday}</Text>
           <Text style={styles.cardLabel}>Hábitos hoje</Text>
         </View>
 
