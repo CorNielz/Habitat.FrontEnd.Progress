@@ -63,6 +63,14 @@ async function request(method: string, path: string, body?: any, params?: Record
     const err: any = new Error(data?.detail || data?.message || res.statusText || 'API error');
     err.status = res.status;
     err.data = data;
+    // Attach ProblemDetails fields if present
+    if (data && typeof data === 'object') {
+      err.title = data.title;
+      err.detail = data.detail;
+      err.instance = data.instance;
+      err.type = data.type;
+      err.errors = data.errors;
+    }
     throw err;
   }
 

@@ -11,6 +11,7 @@ import {
 interface NotesStore {
   notes: Note[];
   loaded: boolean;
+  busy: boolean;
 
   loadNotes: (date?: string) => Promise<void>;
   addNote: (note: Note) => Promise<void>;
@@ -30,8 +31,10 @@ function toRequest(note: Note) {
 export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: [],
   loaded: false,
+  busy: false,
 
   loadNotes: async (date) => {
+    set({ busy: true });
     try {
       const currentFavorites = new Map(get().notes.map((note) => [note.id, note.favorite]));
       const notes = await listNotes(date);
@@ -43,26 +46,43 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     } catch (error) {
       console.error('Error loading notes:', error);
       set({ loaded: true });
+    } finally {
+      set({ busy: false });
     }
   },
 
   addNote: async (note) => {
-    const created = await createNoteRequest(toRequest(note));
-    set((state) => ({ notes: [created, ...state.notes] }));
+    set({ busy: true });
+    try {
+      const created = await createNoteRequest(toRequest(note));
+      set((state) => ({ notes: [created, ...state.notes] }));
+    } finally {
+      set({ busy: false });
+    }
   },
 
   removeNote: async (id) => {
-    await deleteNoteRequest(id);
-    set((state) => ({ notes: state.notes.filter((note) => note.id !== id) }));
+    set({ busy: true });
+    try {
+      await deleteNoteRequest(id);
+      set((state) => ({ notes: state.notes.filter((note) => note.id !== id) }));
+    } finally {
+      set({ busy: false });
+    }
   },
 
   updateNote: async (updatedNote) => {
-    const updated = await updateNoteRequest(updatedNote.id, toRequest(updatedNote));
-    set((state) => ({
-      notes: state.notes.map((note) =>
-        note.id === updated.id ? { ...note, ...updated, favorite: note.favorite } : note
-      ),
-    }));
+    set({ busy: true });
+    try {
+      const updated = await updateNoteRequest(updatedNote.id, toRequest(updatedNote));
+      set((state) => ({
+        notes: state.notes.map((note) =>
+          note.id === updated.id ? { ...note, ...updated, favorite: note.favorite } : note
+        ),
+      }));
+    } finally {
+      set({ busy: false });
+    }
   },
 
   toggleFavorite: (id) =>

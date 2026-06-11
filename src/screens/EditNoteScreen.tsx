@@ -6,12 +6,14 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { colors } from '../styles/colors';
 import { useNotesStore } from '../store/useNotesStore';
+import { showApiError } from '../utils/errorHandler';
 import { Note } from '../types/note';
 
 function formatLocalIso(date: Date) {
@@ -62,6 +64,7 @@ export function EditNoteScreen({ route, navigation }: any) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const updateNote = useNotesStore((state) => state.updateNote);
   const removeNote = useNotesStore((state) => state.removeNote);
+  const busy = useNotesStore((s) => s.busy);
 
   async function handleSave() {
     if (!title.trim()) {
@@ -86,7 +89,7 @@ export function EditNoteScreen({ route, navigation }: any) {
 
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível atualizar a anotação.');
+      showApiError(error, 'Erro');
     }
   }
 
@@ -94,17 +97,17 @@ export function EditNoteScreen({ route, navigation }: any) {
     Alert.alert('Excluir nota', `Deseja excluir "${note.title}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeNote(note.id);
-            navigation.goBack();
-          } catch (error) {
-            Alert.alert('Erro', 'Não foi possível excluir a anotação.');
-          }
+        { text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeNote(note.id);
+              navigation.goBack();
+            } catch (error) {
+              showApiError(error, 'Erro');
+            }
+          },
         },
-      },
     ]);
   }
 
@@ -116,12 +119,12 @@ export function EditNoteScreen({ route, navigation }: any) {
         </TouchableOpacity>
 
         <View style={styles.topActions}>
-          <TouchableOpacity onPress={handleDelete}>
+          <TouchableOpacity onPress={handleDelete} disabled={busy}>
             <Ionicons name="trash-outline" size={22} color="#D32F2F" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={styles.saveText}>Salvar</Text>
+          <TouchableOpacity onPress={handleSave} disabled={busy}>
+            {busy ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.saveText}>Salvar</Text>}
           </TouchableOpacity>
         </View>
       </View>

@@ -13,6 +13,7 @@ import { colors } from '../styles/colors';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { useHabitsStore } from '../store/useHabitsStore';
+import { showApiError } from '../utils/errorHandler';
 import { Habit } from '../types/habit';
 import { toHabitFormValues, type HabitFormValues } from '../services/habits';
 
@@ -34,10 +35,11 @@ export function EditHabitScreen({ route, navigation }: any) {
   const [customFrequencyValue, setCustomFrequencyValue] = useState(
     initialValues.customFrequencyValue || 'MONDAY'
   );
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   const updateHabit = useHabitsStore((s) => s.updateHabit);
   const removeHabit = useHabitsStore((s) => s.removeHabit);
+  const busy = useHabitsStore((s) => s.busy);
 
   async function handleSave() {
     if (!title.trim()) {
@@ -46,7 +48,6 @@ export function EditHabitScreen({ route, navigation }: any) {
     }
 
     try {
-      setLoading(true);
       await updateHabit(habit, {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -54,11 +55,10 @@ export function EditHabitScreen({ route, navigation }: any) {
         customFrequencyValue: customFrequencyValue.trim(),
         startDate: habit.createdAt,
       });
-      setLoading(false);
       navigation.goBack();
     } catch (error: any) {
-      setLoading(false);
-      Alert.alert('Erro', error.message || 'Erro ao atualizar hábito');
+      // store busy handled in store
+      showApiError(error, 'Erro ao atualizar hábito');
     }
   }
 
@@ -68,12 +68,12 @@ export function EditHabitScreen({ route, navigation }: any) {
       {
         text: 'Excluir',
         style: 'destructive',
-        onPress: async () => {
+          onPress: async () => {
           try {
             await removeHabit(habit.id);
             navigation.goBack();
           } catch (error: any) {
-            Alert.alert('Erro', error.message || 'Erro ao excluir hábito');
+            showApiError(error, 'Erro ao excluir hábito');
           }
         },
       },
@@ -159,7 +159,7 @@ export function EditHabitScreen({ route, navigation }: any) {
         <Button
           title="Salvar alterações"
           onPress={handleSave}
-          loading={loading}
+          loading={busy}
         />
       </ScrollView>
     </View>

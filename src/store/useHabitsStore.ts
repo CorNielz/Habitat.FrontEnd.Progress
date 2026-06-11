@@ -17,6 +17,7 @@ import {
 interface HabitsState {
   habits: Habit[];
   loaded: boolean;
+  busy: boolean;
 
   loadHabits: () => Promise<void>;
   addHabit: (habit: HabitFormValues) => Promise<void>;
@@ -126,6 +127,7 @@ function previousDueDate(habit: Habit, date: Date): Date | null {
 export const useHabitsStore = create<HabitsState>((set, get) => ({
   habits: [],
   loaded: false,
+  busy: false,
 
   loadHabits: async () => {
     try {
@@ -147,50 +149,70 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
   },
 
   addHabit: async (habit) => {
-    const created = await createHabitRequest(habit);
-    const updated = [created, ...get().habits];
-    set({ habits: updated });
+    set({ busy: true });
+    try {
+      const created = await createHabitRequest(habit);
+      const updated = [created, ...get().habits];
+      set({ habits: updated });
+    } finally {
+      set({ busy: false });
+    }
   },
 
   updateHabit: async (updatedHabit, data) => {
-    const updatedFromApi = await updateHabitRequest(updatedHabit.id, data);
-    const updated = get().habits.map((h) =>
-      h.id === updatedHabit.id ? { ...updatedFromApi, completedDates: h.completedDates, userId: h.userId } : h
-    );
-    set({ habits: updated });
+    set({ busy: true });
+    try {
+      const updatedFromApi = await updateHabitRequest(updatedHabit.id, data);
+      const updated = get().habits.map((h) =>
+        h.id === updatedHabit.id ? { ...updatedFromApi, completedDates: h.completedDates, userId: h.userId } : h
+      );
+      set({ habits: updated });
+    } finally {
+      set({ busy: false });
+    }
   },
 
   removeHabit: async (id) => {
-    await deleteHabitRequest(id);
-    const updated = get().habits.filter((h) => h.id !== id);
-    set({ habits: updated });
+    set({ busy: true });
+    try {
+      await deleteHabitRequest(id);
+      const updated = get().habits.filter((h) => h.id !== id);
+      set({ habits: updated });
+    } finally {
+      set({ busy: false });
+    }
   },
 
   toggleCompletion: async (id, date) => {
-    const currentHabit = get().habits.find((habit) => habit.id === id);
-    if (!currentHabit) return;
+    set({ busy: true });
+    try {
+      const currentHabit = get().habits.find((habit) => habit.id === id);
+      if (!currentHabit) return;
 
-    const completed = (currentHabit.completedDates || []).includes(date);
+      const completed = (currentHabit.completedDates || []).includes(date);
 
-    if (completed) {
-      await deleteHabitRecordByDate(id, date);
-    } else {
-      await createHabitRecord(id, { recordDate: date });
+      if (completed) {
+        await deleteHabitRecordByDate(id, date);
+      } else {
+        await createHabitRecord(id, { recordDate: date });
+      }
+
+      const updated = get().habits.map((habit) => {
+        if (habit.id !== id) return habit;
+        const dates = habit.completedDates || [];
+
+        return {
+          ...habit,
+          completedDates: completed
+            ? dates.filter((d) => d !== date)
+            : [...dates, date],
+        };
+      });
+
+      set({ habits: updated });
+    } finally {
+      set({ busy: false });
     }
-
-    const updated = get().habits.map((habit) => {
-      if (habit.id !== id) return habit;
-      const dates = habit.completedDates || [];
-
-      return {
-        ...habit,
-        completedDates: completed
-          ? dates.filter((d) => d !== date)
-          : [...dates, date],
-      };
-    });
-
-    set({ habits: updated });
   },
 
   getStreak: (habit) => {

@@ -15,6 +15,7 @@ import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { useHabitsStore } from '../store/useHabitsStore';
 import { type HabitFormValues } from '../services/habits';
+import { showApiError } from '../utils/errorHandler';
 
 function parseLocalDate(iso: string) {
   const [year, month, day] = iso.split('-').map(Number);
@@ -40,9 +41,8 @@ export function CreateHabitScreen({ navigation, route }: any) {
   const [description, setDescription] = useState('');
   const [frequency, setFrequency] = useState<HabitFormValues['frequency']>('daily');
   const [customFrequencyValue, setCustomFrequencyValue] = useState('MONDAY');
-  const [loading, setLoading] = useState(false);
-
   const addHabit = useHabitsStore((s) => s.addHabit);
+  const busy = useHabitsStore((s) => s.busy);
   const createdAtParam = route?.params?.createdAt;
 
   async function handleSave() {
@@ -52,7 +52,6 @@ export function CreateHabitScreen({ navigation, route }: any) {
     }
 
     try {
-      setLoading(true);
       const now = new Date();
       const startDate = createdAtParam
         ? formatLocalIso(parseLocalDate(createdAtParam))
@@ -66,11 +65,10 @@ export function CreateHabitScreen({ navigation, route }: any) {
         startDate,
       });
 
-      setLoading(false);
+      // store busy will be false after operation
       navigation.goBack();
     } catch (error: any) {
-      setLoading(false);
-      Alert.alert('Erro', error.message || 'Erro ao criar hábito');
+      showApiError(error, 'Erro ao criar hábito');
     }
   }
 
@@ -135,7 +133,7 @@ export function CreateHabitScreen({ navigation, route }: any) {
         <Button
           title="Criar hábito"
           onPress={handleSave}
-          loading={loading}
+          loading={busy}
         />
       </ScrollView>
     </View>

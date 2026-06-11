@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../styles/colors';
 import { useNotesStore } from '../store/useNotesStore';
+import { showApiError } from '../utils/errorHandler';
 
 function parseLocalDate(iso: string) {
   const [year, month, day] = iso.split('-').map(Number);
@@ -25,6 +27,7 @@ export function CreateNoteScreen({ navigation, route }: any) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const addNote = useNotesStore((s) => s.addNote);
+  const busy = useNotesStore((s) => s.busy);
   const linkedDate = route?.params?.linkedDate;
 
   async function handleSave() {
@@ -49,19 +52,23 @@ export function CreateNoteScreen({ navigation, route }: any) {
 
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível salvar a anotação.');
+      showApiError(error, 'Erro');
     }
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} disabled={busy}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleSave}>
-          <Text style={styles.saveText}>Salvar</Text>
+        <TouchableOpacity onPress={handleSave} disabled={busy}>
+          {busy ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <Text style={styles.saveText}>Salvar</Text>
+          )}
         </TouchableOpacity>
       </View>
 
