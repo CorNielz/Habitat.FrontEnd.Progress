@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEFAULT_BASE_URL = (process.env.API_BASE_URL as string);
+const DEFAULT_BASE_URL =
+  (process.env.EXPO_PUBLIC_API_BASE_URL as string) ||
+  'https://localhost:5001/api/v1';
 const AUTH_KEY = '@habitat_auth';
 
 let baseUrl = DEFAULT_BASE_URL.replace(/\/+$/g, '');
@@ -47,7 +49,15 @@ async function request(method: string, path: string, body?: any, params?: Record
 
   const text = await res.text();
   const contentType = res.headers.get('content-type') || '';
-  const data = contentType.includes('application/json') ? (text ? JSON.parse(text) : {}) : text;
+  let data: any = text;
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = text;
+    }
+  }
 
   if (!res.ok) {
     const err: any = new Error(data?.detail || data?.message || res.statusText || 'API error');

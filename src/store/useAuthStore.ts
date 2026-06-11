@@ -39,14 +39,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadSession: async () => {
     try {
       const raw = await AsyncStorage.getItem(AUTH_KEY);
-      if (raw) {
-        const { user, token } = JSON.parse(raw);
-        set({ user, token, loaded: true });
-      } else {
+      if (!raw) {
         set({ loaded: true });
+        return;
       }
+
+      const parsed = JSON.parse(raw) as { user?: User; token?: string };
+      if (parsed.token && parsed.user) {
+        set({ user: parsed.user, token: parsed.token });
+      }
+
+      const currentUser = await authService.getCurrentUser();
+      await AsyncStorage.setItem(
+        AUTH_KEY,
+        JSON.stringify({ user: currentUser, token: parsed.token })
+      );
+      set({ user: currentUser, token: parsed.token ?? null, loaded: true });
     } catch {
-      set({ loaded: true });
+      await AsyncStorage.removeItem(AUTH_KEY);
+      set({ user: null, token: null, loaded: true });
     }
   },
 
@@ -57,9 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   register: async (name: string, email: string, password: string) => {
-    const { token, user } = await authService.register(name, email, password);
-    await AsyncStorage.setItem(AUTH_KEY, JSON.stringify({ user, token }));
-    set({ user, token });
+    await authService.register(name, email, password);
   },
 
   logout: async () => {
@@ -79,7 +88,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updatePassword: async (oldPassword: string, newPassword: string) => {
     const { user } = get();
     if (!user) throw new Error('Usuário não autenticado');
-    await authService.updatePassword(user.id, oldPassword, newPassword);
+    await authService.updatePassword(oldPassword, newPassword);
   },
 
   forgotPassword: async (email: string) => {
