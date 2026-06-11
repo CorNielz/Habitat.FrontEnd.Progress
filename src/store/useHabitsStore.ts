@@ -1,26 +1,26 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Habit } from '../types/habit';
-
-const HABITS_KEY = '@habitat_habits';
+import {
+  createHabit as createHabitRequest,
+  deleteHabit as deleteHabitRequest,
+  listHabits,
+  updateHabit as updateHabitRequest,
+  type HabitFormValues,
+} from '../services/habits';
 
 interface HabitsState {
   habits: Habit[];
   loaded: boolean;
 
   loadHabits: () => Promise<void>;
-  addHabit: (habit: Habit) => void;
-  updateHabit: (habit: Habit) => void;
-  removeHabit: (id: string) => void;
+  addHabit: (habit: HabitFormValues) => Promise<void>;
+  updateHabit: (habit: Habit, data: HabitFormValues) => Promise<void>;
+  removeHabit: (id: string) => Promise<void>;
   toggleCompletion: (id: string, date: string) => void;
   getStreak: (habit: Habit) => number;
   getCompletionRate: (habit: Habit, days?: number) => number;
   getTodayProgress: () => { completed: number; total: number };
-}
-
-function persist(habits: Habit[]) {
-  AsyncStorage.setItem(HABITS_KEY, JSON.stringify(habits));
 }
 
 function formatDate(date: Date): string {
@@ -124,32 +124,32 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
 
   loadHabits: async () => {
     try {
-      const raw = await AsyncStorage.getItem(HABITS_KEY);
-      const habits = raw ? JSON.parse(raw) : [];
+      const habits = await listHabits();
       set({ habits, loaded: true });
-    } catch {
+    } catch (error) {
+      console.error('Error loading habits:', error);
       set({ loaded: true });
     }
   },
 
-  addHabit: (habit) => {
-    const updated = [habit, ...get().habits];
+  addHabit: async (habit) => {
+    const created = await createHabitRequest(habit);
+    const updated = [created, ...get().habits];
     set({ habits: updated });
-    persist(updated);
   },
 
-  updateHabit: (updatedHabit) => {
+  updateHabit: async (updatedHabit, data) => {
+    const updatedFromApi = await updateHabitRequest(updatedHabit.id, data);
     const updated = get().habits.map((h) =>
-      h.id === updatedHabit.id ? updatedHabit : h
+      h.id === updatedHabit.id ? updatedFromApi : h
     );
     set({ habits: updated });
-    persist(updated);
   },
 
-  removeHabit: (id) => {
+  removeHabit: async (id) => {
+    await deleteHabitRequest(id);
     const updated = get().habits.filter((h) => h.id !== id);
     set({ habits: updated });
-    persist(updated);
   },
 
   toggleCompletion: (id, date) => {
@@ -168,7 +168,6 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
     });
 
     set({ habits: updated });
-    persist(updated);
   },
 
   getStreak: (habit) => {

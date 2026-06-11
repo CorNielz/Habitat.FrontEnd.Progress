@@ -14,43 +14,52 @@ import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { useHabitsStore } from '../store/useHabitsStore';
 import { Habit } from '../types/habit';
+import { toHabitFormValues, type HabitFormValues } from '../services/habits';
 
 const FREQUENCIES = [
-  { value: 'single', label: 'Único' },
   { value: 'daily', label: 'Diário' },
   { value: 'weekly', label: 'Semanal' },
   { value: 'monthly', label: 'Mensal' },
+  { value: 'custom', label: 'Personalizado' },
 ] as const;
 
 export function EditHabitScreen({ route, navigation }: any) {
   const { habit } = route.params as { habit: Habit };
-  const [title, setTitle] = useState(habit.title);
-  const [description, setDescription] = useState(habit.description || '');
-  const [frequency, setFrequency] = useState<'single' | 'daily' | 'weekly' | 'monthly'>(
-    habit.frequency as 'single' | 'daily' | 'weekly' | 'monthly'
+  const initialValues = toHabitFormValues(habit);
+  const [title, setTitle] = useState(initialValues.title);
+  const [description, setDescription] = useState(initialValues.description || '');
+  const [frequency, setFrequency] = useState<HabitFormValues['frequency']>(
+    initialValues.frequency
+  );
+  const [customFrequencyValue, setCustomFrequencyValue] = useState(
+    initialValues.customFrequencyValue || 'MONDAY'
   );
   const [loading, setLoading] = useState(false);
 
   const updateHabit = useHabitsStore((s) => s.updateHabit);
   const removeHabit = useHabitsStore((s) => s.removeHabit);
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) {
       Alert.alert('Atenção', 'Informe um título');
       return;
     }
 
-    setLoading(true);
-    setTimeout(() => {
-      updateHabit({
-        ...habit,
+    try {
+      setLoading(true);
+      await updateHabit(habit, {
         title: title.trim(),
         description: description.trim() || undefined,
         frequency,
+        customFrequencyValue: customFrequencyValue.trim(),
+        startDate: habit.createdAt,
       });
       setLoading(false);
       navigation.goBack();
-    }, 500);
+    } catch (error: any) {
+      setLoading(false);
+      Alert.alert('Erro', error.message || 'Erro ao atualizar hábito');
+    }
   }
 
   function handleDelete() {
@@ -59,9 +68,13 @@ export function EditHabitScreen({ route, navigation }: any) {
       {
         text: 'Excluir',
         style: 'destructive',
-        onPress: () => {
-          removeHabit(habit.id);
-          navigation.goBack();
+        onPress: async () => {
+          try {
+            await removeHabit(habit.id);
+            navigation.goBack();
+          } catch (error: any) {
+            Alert.alert('Erro', error.message || 'Erro ao excluir hábito');
+          }
         },
       },
     ]);
@@ -117,6 +130,15 @@ export function EditHabitScreen({ route, navigation }: any) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {frequency === 'custom' && (
+          <Input
+            placeholder="Ex: MONDAY,WEDNESDAY,FRIDAY"
+            value={customFrequencyValue}
+            onChangeText={setCustomFrequencyValue}
+            label="Dias da semana"
+          />
+        )}
 
         <View style={styles.statsSection}>
           <Text style={styles.statsTitle}>Estatísticas</Text>
