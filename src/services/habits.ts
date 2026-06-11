@@ -77,7 +77,7 @@ function mapFrequencyType(frequencyType: HabitFrequencyType): Habit['frequency']
   }
 }
 
-function mapHabit(response: ApiHabitResponse): Habit {
+export function mapHabit(response: ApiHabitResponse, base?: Partial<Habit>): Habit {
   return {
     id: String(response.id),
     title: response.title,
@@ -85,8 +85,8 @@ function mapHabit(response: ApiHabitResponse): Habit {
     frequency: mapFrequencyType(response.frequencyType),
     customDays: response.frequencyType === 'CUSTOM' ? parseCustomDays(response.frequencyValue) : undefined,
     createdAt: response.startDate,
-    completedDates: [],
-    userId: '',
+    completedDates: base?.completedDates ?? [],
+    userId: base?.userId ?? '',
   };
 }
 
@@ -118,7 +118,7 @@ async function loadAllHabits(): Promise<Habit[]> {
   do {
     const response = (await api.get('/habits', { page, pageSize })) as PagedHabitResponse;
     totalPages = response.totalPages || 1;
-    habits.push(...response.items.map(mapHabit));
+    habits.push(...response.items.map((habit) => mapHabit(habit)));
     page += 1;
   } while (page <= totalPages);
 

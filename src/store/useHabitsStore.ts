@@ -8,6 +8,11 @@ import {
   updateHabit as updateHabitRequest,
   type HabitFormValues,
 } from '../services/habits';
+import {
+  createHabitRecord,
+  deleteHabitRecordByDate,
+  listHabitRecords,
+} from '../services/habitRecords';
 
 interface HabitsState {
   habits: Habit[];
@@ -17,7 +22,7 @@ interface HabitsState {
   addHabit: (habit: HabitFormValues) => Promise<void>;
   updateHabit: (habit: Habit, data: HabitFormValues) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
-  toggleCompletion: (id: string, date: string) => void;
+  toggleCompletion: (id: string, date: string) => Promise<void>;
   getStreak: (habit: Habit) => number;
   getCompletionRate: (habit: Habit, days?: number) => number;
   getTodayProgress: () => { completed: number; total: number };
@@ -125,7 +130,16 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
   loadHabits: async () => {
     try {
       const habits = await listHabits();
-      set({ habits, loaded: true });
+      const hydratedHabits = await Promise.all(
+        habits.map(async (habit) => {
+          const records = await listHabitRecords(habit.id, { from: habit.createdAt });
+          return {
+            ...habit,
+            completedDates: records.map((record) => record.recordDate),
+          };
+        })
+      );
+      set({ habits: hydratedHabits, loaded: true });
     } catch (error) {
       console.error('Error loading habits:', error);
       set({ loaded: true });
@@ -141,7 +155,7 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
   updateHabit: async (updatedHabit, data) => {
     const updatedFromApi = await updateHabitRequest(updatedHabit.id, data);
     const updated = get().habits.map((h) =>
-      h.id === updatedHabit.id ? updatedFromApi : h
+      h.id === updatedHabit.id ? { ...updatedFromApi, completedDates: h.completedDates, userId: h.userId } : h
     );
     set({ habits: updated });
   },
@@ -152,16 +166,25 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
     set({ habits: updated });
   },
 
-  toggleCompletion: (id, date) => {
-    const updated = get().habits.map((h) => {
-      if (h.id !== id) return h;
+  toggleCompletion: async (id, date) => {
+    const currentHabit = get().habits.find((habit) => habit.id === id);
+    if (!currentHabit) return;
 
-      const dates = h.completedDates || [];
-      const index = dates.indexOf(date);
+    const completed = (currentHabit.completedDates || []).includes(date);
+
+    if (completed) {
+      await deleteHabitRecordByDate(id, date);
+    } else {
+      await createHabitRecord(id, { recordDate: date });
+    }
+
+    const updated = get().habits.map((habit) => {
+      if (habit.id !== id) return habit;
+      const dates = habit.completedDates || [];
 
       return {
-        ...h,
-        completedDates: index >= 0
+        ...habit,
+        completedDates: completed
           ? dates.filter((d) => d !== date)
           : [...dates, date],
       };
