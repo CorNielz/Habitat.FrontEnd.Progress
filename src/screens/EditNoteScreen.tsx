@@ -63,7 +63,7 @@ export function EditNoteScreen({ route, navigation }: any) {
   const updateNote = useNotesStore((state) => state.updateNote);
   const removeNote = useNotesStore((state) => state.removeNote);
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) {
       Alert.alert('Atenção', 'Digite um título para a nota');
       return;
@@ -74,16 +74,20 @@ export function EditNoteScreen({ route, navigation }: any) {
       return;
     }
 
-    updateNote({
-      ...note,
-      title: title.trim(),
-      content: content.trim(),
-      createdAt: formatPtBrFromIso(noteDate),
-      linkedDate: noteDate,
-      updatedAt: new Date().toLocaleDateString('pt-BR'),
-    });
+    try {
+      await updateNote({
+        ...note,
+        title: title.trim(),
+        content: content.trim(),
+        createdAt: formatPtBrFromIso(noteDate),
+        linkedDate: noteDate,
+        updatedAt: new Date().toLocaleDateString('pt-BR'),
+      });
 
-    navigation.goBack();
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível atualizar a anotação.');
+    }
   }
 
   function handleDelete() {
@@ -92,9 +96,13 @@ export function EditNoteScreen({ route, navigation }: any) {
       {
         text: 'Excluir',
         style: 'destructive',
-        onPress: () => {
-          removeNote(note.id);
-          navigation.goBack();
+        onPress: async () => {
+          try {
+            await removeNote(note.id);
+            navigation.goBack();
+          } catch (error) {
+            Alert.alert('Erro', 'Não foi possível excluir a anotação.');
+          }
         },
       },
     ]);

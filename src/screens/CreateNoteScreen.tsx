@@ -11,7 +11,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../styles/colors';
 import { useNotesStore } from '../store/useNotesStore';
-import { useAuthStore } from '../store/useAuthStore';
 
 function parseLocalDate(iso: string) {
   const [year, month, day] = iso.split('-').map(Number);
@@ -26,10 +25,9 @@ export function CreateNoteScreen({ navigation, route }: any) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const addNote = useNotesStore((s) => s.addNote);
-  const user = useAuthStore((s) => s.user);
   const linkedDate = route?.params?.linkedDate;
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) {
       Alert.alert('Atenção', 'Digite um título para a nota');
       return;
@@ -37,20 +35,22 @@ export function CreateNoteScreen({ navigation, route }: any) {
 
     const now = new Date();
     const selectedDate = linkedDate || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const createdAt = formatPtBrFromIso(selectedDate);
 
-    addNote({
-      id: String(Date.now()),
-      title: title.trim(),
-      content: content.trim(),
-      createdAt,
-      updatedAt: createdAt,
-      favorite: false,
-      userId: user?.id || '',
-      linkedDate: selectedDate,
-    });
+    try {
+      await addNote({
+        id: String(Date.now()),
+        title: title.trim(),
+        content: content.trim(),
+        createdAt: formatPtBrFromIso(selectedDate),
+        updatedAt: formatPtBrFromIso(selectedDate),
+        favorite: false,
+        linkedDate: selectedDate,
+      });
 
-    navigation.goBack();
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível salvar a anotação.');
+    }
   }
 
   return (
