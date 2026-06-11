@@ -6,12 +6,14 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { colors } from '../styles/colors';
 import { useNotesStore } from '../store/useNotesStore';
+import { showApiError } from '../utils/errorHandler';
 import { Note } from '../types/note';
 
 function formatLocalIso(date: Date) {
@@ -62,8 +64,9 @@ export function EditNoteScreen({ route, navigation }: any) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const updateNote = useNotesStore((state) => state.updateNote);
   const removeNote = useNotesStore((state) => state.removeNote);
+  const busy = useNotesStore((s) => s.busy);
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) {
       Alert.alert('Atenção', 'Digite um título para a nota');
       return;
@@ -74,29 +77,37 @@ export function EditNoteScreen({ route, navigation }: any) {
       return;
     }
 
-    updateNote({
-      ...note,
-      title: title.trim(),
-      content: content.trim(),
-      createdAt: formatPtBrFromIso(noteDate),
-      linkedDate: noteDate,
-      updatedAt: new Date().toLocaleDateString('pt-BR'),
-    });
+    try {
+      await updateNote({
+        ...note,
+        title: title.trim(),
+        content: content.trim(),
+        createdAt: formatPtBrFromIso(noteDate),
+        linkedDate: noteDate,
+        updatedAt: new Date().toLocaleDateString('pt-BR'),
+      });
 
-    navigation.goBack();
+      navigation.goBack();
+    } catch (error) {
+      showApiError(error, 'Erro');
+    }
   }
 
   function handleDelete() {
     Alert.alert('Excluir nota', `Deseja excluir "${note.title}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: () => {
-          removeNote(note.id);
-          navigation.goBack();
+        { text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeNote(note.id);
+              navigation.goBack();
+            } catch (error) {
+              showApiError(error, 'Erro');
+            }
+          },
         },
-      },
     ]);
   }
 
@@ -108,12 +119,12 @@ export function EditNoteScreen({ route, navigation }: any) {
         </TouchableOpacity>
 
         <View style={styles.topActions}>
-          <TouchableOpacity onPress={handleDelete}>
+          <TouchableOpacity onPress={handleDelete} disabled={busy}>
             <Ionicons name="trash-outline" size={22} color="#D32F2F" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={styles.saveText}>Salvar</Text>
+          <TouchableOpacity onPress={handleSave} disabled={busy}>
+            {busy ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.saveText}>Salvar</Text>}
           </TouchableOpacity>
         </View>
       </View>

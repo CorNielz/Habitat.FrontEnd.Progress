@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as adminService from '../services/admin';
 
 import { colors } from '../styles/colors';
 import { useAuthStore } from '../store/useAuthStore';
@@ -23,6 +24,7 @@ interface SystemStats {
 
 export function AdminScreen({ navigation }: any) {
   const user = useAuthStore((state) => state.user);
+  const isAdmin = useAuthStore((state) => state.isAdmin);
   const habits = useHabitsStore((state) => state.habits);
   const notes = useNotesStore((state) => state.notes);
   const [stats, setStats] = useState<SystemStats>({
@@ -30,9 +32,12 @@ export function AdminScreen({ navigation }: any) {
     totalHabits: 0,
     totalNotes: 0,
   });
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     loadStats();
+    if (isAdmin) loadAdminUsers();
   }, []);
 
   async function loadStats() {
@@ -42,13 +47,50 @@ export function AdminScreen({ navigation }: any) {
       const authRaw = await AsyncStorage.getItem('@habitat_auth');
 
       setStats({
-        totalUsers: 2, // Mock
+        totalUsers: 2, // fallback
         totalHabits: habitsRaw ? JSON.parse(habitsRaw).length : 0,
         totalNotes: notesRaw ? JSON.parse(notesRaw).length : 0,
       });
     } catch (error) {
       console.error('Error loading stats:', error);
     }
+  }
+
+  async function loadAdminUsers() {
+    setLoadingUsers(true);
+    try {
+      const res = await adminService.listUsers(1, 100);
+      setUsers(res.items.map((u) => ({ ...u, id: String(u.id) })));
+      setStats((s) => ({ ...s, totalUsers: res.totalItems }));
+    } catch (err) {
+      console.warn('Failed to load admin users', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  async function toggleUserRole(targetId: string, currentRole: string) {
+    const nextRole = currentRole === 'admin' ? 'user' : 'admin';
+    Alert.alert(
+      'Alterar papel',
+      `Deseja alterar o papel do usuário para ${nextRole.toUpperCase()}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: async () => {
+            try {
+              await adminService.updateUserRole(targetId, nextRole as 'admin' | 'user');
+              await loadAdminUsers();
+              Alert.alert('Sucesso', 'Papel atualizado com sucesso');
+            } catch (err: any) {
+              console.error('Failed to update role', err);
+              Alert.alert('Erro', err?.message || 'Não foi possível atualizar o papel');
+            }
+          },
+        },
+      ]
+    );
   }
 
   function handleClearData() {
@@ -87,11 +129,11 @@ export function AdminScreen({ navigation }: any) {
         <Text style={styles.sectionTitle}>Estatísticas do Sistema</Text>
 
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Ionicons name="people" size={28} color={colors.primary} />
-            <Text style={styles.statNumber}>{stats.totalUsers}</Text>
-            <Text style={styles.statLabel}>Usuários</Text>
-          </View>
+            <View style={styles.statCard}>
+              <Ionicons name="people" size={28} color={colors.primary} />
+              <Text style={styles.statNumber}>{stats.totalUsers}</Text>
+              <Text style={styles.statLabel}>Usuários</Text>
+            </View>
 
           <View style={styles.statCard}>
             <Ionicons name="leaf" size={28} color={colors.primary} />
@@ -107,7 +149,6 @@ export function AdminScreen({ navigation }: any) {
         </View>
 
         <Text style={styles.sectionTitle}>Dados do Sistema</Text>
-
         <View style={styles.menu}>
           <TouchableOpacity style={styles.menuItem} onPress={loadStats}>
             <Ionicons name="refresh" size={22} color={colors.primary} />
@@ -123,15 +164,41 @@ export function AdminScreen({ navigation }: any) {
             <Ionicons name="chevron-forward" size={18} color={colors.border} />
           </TouchableOpacity>
         </View>
+        {isAdmin ? (
+          <>
+            <Text style={styles.sectionTitle}>Usuários</Text>
+            <FlatList
+              data={users}
+              keyExtractor={(it) => String(it.id)}
+              renderItem={({ item }) => (
+                <View style={[styles.menuItem, { justifyContent: 'space-between' }]}> 
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: '700' }}>{item.name}</Text>
+                    <Text style={{ color: colors.textSecondary }}>{item.email}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => toggleUserRole(String(item.id), item.role)}>
+                    <Text style={{ color: colors.primary, fontWeight: '700' }}>{item.role}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              ListEmptyComponent={() => (
+                <View style={{ padding: 16 }}>
+                  <Text style={{ color: colors.textSecondary }}>{loadingUsers ? 'Carregando usuários...' : 'Nenhum usuário encontrado'}</Text>
+                </View>
+              )}
+            />
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Informações</Text>
 
-        <Text style={styles.sectionTitle}>Informações</Text>
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Esta é uma versão de demonstração. Os dados são armazenados localmente
-            no dispositivo usando AsyncStorage.
-          </Text>
-        </View>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoText}>
+                Acesso restrito: você precisa de privilégios de administrador para ver dados do sistema.
+              </Text>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );

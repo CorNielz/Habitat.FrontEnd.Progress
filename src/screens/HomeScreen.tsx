@@ -16,6 +16,8 @@ import { useHabitsStore } from '../store/useHabitsStore';
 import { useNotesStore } from '../store/useNotesStore';
 import { WEEKDAY_LABELS } from '../types/habit';
 import { useMemo } from 'react';
+import { getDashboardSummary } from '../services/dashboard';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 export function HomeScreen({ navigation }: any) {
   const user = useAuthStore((s) => s.user);
@@ -35,6 +37,10 @@ export function HomeScreen({ navigation }: any) {
   const completedToday = todayProgress.completed;
   const dueToday = todayProgress.total;
   const totalHabits = habits.length;
+  const [apiSummary, setApiSummary] = React.useState<any | null>(null);
+
+  const settings = useSettingsStore((s) => s.settings);
+
   const streak = habits.reduce((max, h) => {
     let count = 0;
     const d = new Date();
@@ -150,6 +156,24 @@ export function HomeScreen({ navigation }: any) {
     return acc;
   }, {} as Record<string, any[]>);
 
+  React.useEffect(() => {
+    let mounted = true;
+    async function loadSummary() {
+      if (!settings?.showHomeSummary) return;
+      try {
+        const summary = await getDashboardSummary(settings.defaultDashboardPeriod);
+        if (!mounted) return;
+        setApiSummary(summary);
+      } catch (err) {
+        console.warn('Dashboard summary failed, using local calculations', err);
+        setApiSummary(null);
+      }
+    }
+
+    loadSummary();
+    return () => { mounted = false; };
+  }, [settings, habits.length]);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -168,19 +192,19 @@ export function HomeScreen({ navigation }: any) {
       <View style={styles.cards}>
         <View style={styles.card}>
           <Ionicons name="checkmark-circle" size={32} color={colors.primary} />
-          <Text style={styles.cardNumber}>{completedToday}/{dueToday}</Text>
+          <Text style={styles.cardNumber}>{apiSummary ? apiSummary.completedToday : `${completedToday}/${dueToday}`}</Text>
           <Text style={styles.cardLabel}>Hábitos hoje</Text>
         </View>
 
         <View style={styles.card}>
           <Ionicons name="flame" size={32} color="#FF6B35" />
-          <Text style={styles.cardNumber}>{streak}</Text>
+          <Text style={styles.cardNumber}>{apiSummary ? apiSummary.currentStreak : streak}</Text>
           <Text style={styles.cardLabel}>Sequência</Text>
         </View>
 
         <View style={styles.card}>
           <Ionicons name="document-text" size={32} color={colors.primary} />
-          <Text style={styles.cardNumber}>{notes.length}</Text>
+          <Text style={styles.cardNumber}>{apiSummary ? apiSummary.notesCount : notes.length}</Text>
           <Text style={styles.cardLabel}>Anotações</Text>
         </View>
       </View>

@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { User } from '../types/user';
 import * as authService from '../services/auth';
+import * as userService from '../services/user';
 
 const AUTH_KEY = '@habitat_auth';
 
@@ -18,7 +19,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => void;
+  updateProfile: (data: Partial<User>) => Promise<void>;
   updatePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
 }
@@ -39,14 +40,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadSession: async () => {
     try {
       const raw = await AsyncStorage.getItem(AUTH_KEY);
-      if (raw) {
-        const { user, token } = JSON.parse(raw);
-        set({ user, token, loaded: true });
-      } else {
+      if (!raw) {
         set({ loaded: true });
+        return;
       }
+
+      const parsed = JSON.parse(raw) as { user?: User; token?: string };
+      if (parsed.token && parsed.user) {
+        set({ user: parsed.user, token: parsed.token });
+      }
+
+      const currentUser = await userService.getCurrentUser();
+      await AsyncStorage.setItem(
+        AUTH_KEY,
+        JSON.stringify({ user: currentUser, token: parsed.token })
+      );
+      set({ user: currentUser, token: parsed.token ?? null, loaded: true });
     } catch {
-      set({ loaded: true });
+      await AsyncStorage.removeItem(AUTH_KEY);
+      set({ user: null, token: null, loaded: true });
     }
   },
 
@@ -57,9 +69,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   register: async (name: string, email: string, password: string) => {
-    const { token, user } = await authService.register(name, email, password);
-    await AsyncStorage.setItem(AUTH_KEY, JSON.stringify({ user, token }));
-    set({ user, token });
+    await authService.register(name, email, password);
   },
 
   logout: async () => {
@@ -67,19 +77,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: null, token: null });
   },
 
-  updateProfile: (data: Partial<User>) => {
+  updateProfile: async (data: Partial<User>) => {
     const { user } = get();
     if (!user) return;
 
-    const updatedUser = { ...user, ...data };
-    AsyncStorage.setItem(AUTH_KEY, JSON.stringify({ user: updatedUser, token: get().token }));
+    const updatedUser = await userService.updateCurrentUserProfile({
+      name: data.name ?? user.name,
+    });
+
+    await AsyncStorage.setItem(
+      AUTH_KEY,
+      JSON.stringify({ user: updatedUser, token: get().token })
+    );
     set({ user: updatedUser });
   },
 
   updatePassword: async (oldPassword: string, newPassword: string) => {
     const { user } = get();
     if (!user) throw new Error('Usuário não autenticado');
-    await authService.updatePassword(user.id, oldPassword, newPassword);
+    await authService.updatePassword(oldPassword, newPassword);
   },
 
   forgotPassword: async (email: string) => {

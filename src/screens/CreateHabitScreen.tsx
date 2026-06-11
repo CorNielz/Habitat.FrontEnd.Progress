@@ -14,7 +14,8 @@ import { colors } from '../styles/colors';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { useHabitsStore } from '../store/useHabitsStore';
-import { useAuthStore } from '../store/useAuthStore';
+import { type HabitFormValues } from '../services/habits';
+import { showApiError } from '../utils/errorHandler';
 
 function parseLocalDate(iso: string) {
   const [year, month, day] = iso.split('-').map(Number);
@@ -29,45 +30,46 @@ function formatLocalIso(date: Date) {
 }
 
 const FREQUENCIES = [
-  { value: 'single', label: 'Único' },
   { value: 'daily', label: 'Diário' },
   { value: 'weekly', label: 'Semanal' },
   { value: 'monthly', label: 'Mensal' },
+  { value: 'custom', label: 'Personalizado' },
 ] as const;
 
 export function CreateHabitScreen({ navigation, route }: any) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [frequency, setFrequency] = useState<'single' | 'daily' | 'weekly' | 'monthly'>('single');
-  const [loading, setLoading] = useState(false);
-
+  const [frequency, setFrequency] = useState<HabitFormValues['frequency']>('daily');
+  const [customFrequencyValue, setCustomFrequencyValue] = useState('MONDAY');
   const addHabit = useHabitsStore((s) => s.addHabit);
-  const user = useAuthStore((s) => s.user);
+  const busy = useHabitsStore((s) => s.busy);
   const createdAtParam = route?.params?.createdAt;
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) {
       Alert.alert('Atenção', 'Informe um título para o hábito');
       return;
     }
 
-    setLoading(true);
-    setTimeout(() => {
+    try {
       const now = new Date();
-      const createdAt = createdAtParam ? formatLocalIso(parseLocalDate(createdAtParam)) : formatLocalIso(now);
+      const startDate = createdAtParam
+        ? formatLocalIso(parseLocalDate(createdAtParam))
+        : formatLocalIso(now);
 
-      addHabit({
-        id: String(Date.now()),
+      await addHabit({
         title: title.trim(),
         description: description.trim() || undefined,
         frequency,
-        createdAt,
-        completedDates: [],
-        userId: user?.id || '',
+        customFrequencyValue: customFrequencyValue.trim(),
+        startDate,
       });
-      setLoading(false);
+
+      // store busy will be false after operation
       navigation.goBack();
-    }, 500);
+    } catch (error: any) {
+      showApiError(error, 'Erro ao criar hábito');
+    }
   }
 
   return (
@@ -119,10 +121,19 @@ export function CreateHabitScreen({ navigation, route }: any) {
           ))}
         </View>
 
+        {frequency === 'custom' && (
+          <Input
+            placeholder="Ex: MONDAY,WEDNESDAY,FRIDAY"
+            value={customFrequencyValue}
+            onChangeText={setCustomFrequencyValue}
+            label="Dias da semana"
+          />
+        )}
+
         <Button
           title="Criar hábito"
           onPress={handleSave}
-          loading={loading}
+          loading={busy}
         />
       </ScrollView>
     </View>

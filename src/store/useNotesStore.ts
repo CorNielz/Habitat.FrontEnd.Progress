@@ -1,62 +1,89 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Note } from '../types/note';
-import { useAuthStore } from './useAuthStore';
-
-const NOTES_KEY = '@habitat_notes';
+import {
+  createNote as createNoteRequest,
+  deleteNote as deleteNoteRequest,
+  listNotes,
+  updateNote as updateNoteRequest,
+} from '../services/notes';
 
 interface NotesStore {
   notes: Note[];
   loaded: boolean;
+  busy: boolean;
 
-  loadNotes: () => Promise<void>;
-  addNote: (note: Note) => void;
-  removeNote: (id: string) => void;
-  updateNote: (note: Note) => void;
+  loadNotes: (date?: string) => Promise<void>;
+  addNote: (note: Note) => Promise<void>;
+  removeNote: (id: string) => Promise<void>;
+  updateNote: (note: Note) => Promise<void>;
   toggleFavorite: (id: string) => void;
 }
 
-async function persist(notes: Note[]) {
-  await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+function toRequest(note: Note) {
+  return {
+    title: note.title.trim() || undefined,
+    content: note.content.trim(),
+    date: note.linkedDate || note.createdAt.split('/').reverse().join('-') || new Date().toISOString().split('T')[0],
+  };
 }
 
 export const useNotesStore = create<NotesStore>((set, get) => ({
   notes: [],
   loaded: false,
+  busy: false,
 
-  loadNotes: async () => {
-    const raw = await AsyncStorage.getItem(NOTES_KEY);
-    const notes: Note[] = raw ? JSON.parse(raw) : [];
-    const userId = useAuthStore.getState().user?.id;
-    const userNotes = userId
-      ? notes.filter((n) => n.userId === userId)
-      : notes;
-    set({ notes: userNotes, loaded: true });
+  loadNotes: async (date) => {
+    set({ busy: true });
+    try {
+      const currentFavorites = new Map(get().notes.map((note) => [note.id, note.favorite]));
+      const notes = await listNotes(date);
+      const merged = notes.map((note) => ({
+        ...note,
+        favorite: currentFavorites.get(note.id) ?? note.favorite,
+      }));
+      set({ notes: merged, loaded: true });
+    } catch (error) {
+      console.error('Error loading notes:', error);
+      set({ loaded: true });
+    } finally {
+      set({ busy: false });
+    }
   },
 
-  addNote: (note) =>
-    set((state) => {
-      const notes = [note, ...state.notes];
-      persist(notes);
-      return { notes };
-    }),
+  addNote: async (note) => {
+    set({ busy: true });
+    try {
+      const created = await createNoteRequest(toRequest(note));
+      set((state) => ({ notes: [created, ...state.notes] }));
+    } finally {
+      set({ busy: false });
+    }
+  },
 
-  removeNote: (id) =>
-    set((state) => {
-      const notes = state.notes.filter((note) => note.id !== id);
-      persist(notes);
-      return { notes };
-    }),
+  removeNote: async (id) => {
+    set({ busy: true });
+    try {
+      await deleteNoteRequest(id);
+      set((state) => ({ notes: state.notes.filter((note) => note.id !== id) }));
+    } finally {
+      set({ busy: false });
+    }
+  },
 
-  updateNote: (updatedNote) =>
-    set((state) => {
-      const notes = state.notes.map((note) =>
-        note.id === updatedNote.id ? updatedNote : note
-      );
-      persist(notes);
-      return { notes };
-    }),
+  updateNote: async (updatedNote) => {
+    set({ busy: true });
+    try {
+      const updated = await updateNoteRequest(updatedNote.id, toRequest(updatedNote));
+      set((state) => ({
+        notes: state.notes.map((note) =>
+          note.id === updated.id ? { ...note, ...updated, favorite: note.favorite } : note
+        ),
+      }));
+    } finally {
+      set({ busy: false });
+    }
+  },
 
   toggleFavorite: (id) =>
     set((state) => {
@@ -66,7 +93,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         }
         return note;
       });
-      persist(notes);
       return { notes };
     }),
 }));

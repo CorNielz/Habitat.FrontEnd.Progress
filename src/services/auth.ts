@@ -1,135 +1,92 @@
+import { api } from './api';
 import { User } from '../types/user';
 
-const MOCK_USERS: Record<string, { password: string; user: User }> = {
-  'admin@habitat.com': {
-    password: 'admin123',
-    user: {
-      id: '1',
-      name: 'Administrador',
-      email: 'admin@habitat.com',
-      role: 'admin',
-      createdAt: '2026-01-01',
-    },
-  },
-  'user@habitat.com': {
-    password: 'user123',
-    user: {
-      id: '2',
-      name: 'Usuário Teste',
-      email: 'user@habitat.com',
-      role: 'user',
-      createdAt: '2026-03-15',
-    },
-  },
-};
+interface ApiUserResponse {
+  id: number;
+  name: string;
+  email: string;
+  role: 'USER' | 'ADMIN';
+  createdAt: string;
+  avatar?: string;
+}
 
-export async function login(
-  email: string,
-  password: string
-): Promise<{ token: string; user: User }> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (!email || !password) {
-        reject(new Error('Preencha todos os campos'));
-        return;
-      }
+interface LoginResponse {
+  accessToken: string;
+  tokenType: 'Bearer';
+  expiresIn: number;
+  user: ApiUserResponse;
+}
 
-      const mockUser = MOCK_USERS[email.toLowerCase()];
+interface AuthSession {
+  token: string;
+  user: User;
+}
 
-      if (!mockUser || mockUser.password !== password) {
-        reject(new Error('E-mail ou senha incorretos'));
-        return;
-      }
+function normalizeRole(role: ApiUserResponse['role']): User['role'] {
+  return role === 'ADMIN' ? 'admin' : 'user';
+}
 
-      resolve({
-        token: `mock-token-${mockUser.user.id}`,
-        user: mockUser.user,
-      });
-    }, 1200);
+function mapUser(user: ApiUserResponse): User {
+  return {
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    role: normalizeRole(user.role),
+    createdAt: user.createdAt,
+    avatar: user.avatar,
+  };
+}
+
+function mapLoginResponse(response: LoginResponse): AuthSession {
+  return {
+    token: response.accessToken,
+    user: mapUser(response.user),
+  };
+}
+
+export async function login(email: string, password: string): Promise<AuthSession> {
+  if (!email.trim() || !password.trim()) {
+    throw new Error('Preencha todos os campos');
+  }
+
+  const response = await api.post('/auth/login', {
+    email: email.trim(),
+    password,
+  });
+
+  return mapLoginResponse(response as LoginResponse);
+}
+
+export async function register(name: string, email: string, password: string): Promise<User> {
+  if (!name.trim() || !email.trim() || !password.trim()) {
+    throw new Error('Preencha todos os campos');
+  }
+
+  const response = await api.post('/auth/register', {
+    name: name.trim(),
+    email: email.trim(),
+    password,
+  });
+
+  return mapUser(response as ApiUserResponse);
+}
+
+export async function updatePassword(currentPassword: string, newPassword: string): Promise<void> {
+  if (!currentPassword.trim() || !newPassword.trim()) {
+    throw new Error('Preencha todos os campos');
+  }
+
+  await api.put('/users/me/password', {
+    currentPassword,
+    newPassword,
   });
 }
 
-export async function register(
-  name: string,
-  email: string,
-  password: string
-): Promise<{ token: string; user: User }> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (!name || !email || !password) {
-        reject(new Error('Preencha todos os campos'));
-        return;
-      }
-
-      if (password.length < 6) {
-        reject(new Error('A senha deve ter no mínimo 6 caracteres'));
-        return;
-      }
-
-      if (MOCK_USERS[email.toLowerCase()]) {
-        reject(new Error('Este e-mail já está cadastrado'));
-        return;
-      }
-
-      const newUser: User = {
-        id: String(Date.now()),
-        name,
-        email: email.toLowerCase(),
-        role: 'user',
-        createdAt: new Date().toISOString(),
-      };
-
-      MOCK_USERS[email.toLowerCase()] = { password, user: newUser };
-
-      resolve({
-        token: `mock-token-${newUser.id}`,
-        user: newUser,
-      });
-    }, 1200);
-  });
+export async function getCurrentUser(): Promise<User> {
+  const response = await api.get('/users/me');
+  return mapUser(response as ApiUserResponse);
 }
 
-export async function forgotPassword(email: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (!email) {
-        reject(new Error('Informe seu e-mail'));
-        return;
-      }
-
-      if (!MOCK_USERS[email.toLowerCase()]) {
-        reject(new Error('E-mail não encontrado'));
-        return;
-      }
-
-      resolve();
-    }, 1200);
-  });
-}
-
-export async function updatePassword(
-  userId: string,
-  oldPassword: string,
-  newPassword: string
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      const entry = Object.values(MOCK_USERS).find(
-        (u) => u.user.id === userId
-      );
-
-      if (!entry || entry.password !== oldPassword) {
-        reject(new Error('Senha atual incorreta'));
-        return;
-      }
-
-      if (newPassword.length < 6) {
-        reject(new Error('A nova senha deve ter no mínimo 6 caracteres'));
-        return;
-      }
-
-      entry.password = newPassword;
-      resolve();
-    }, 1200);
-  });
+export async function forgotPassword(_email: string): Promise<void> {
+  throw new Error('Recuperação de senha não está disponível nesta API');
 }
