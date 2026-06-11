@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,84 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '../styles/colors';
 import { useAuthStore } from '../store/useAuthStore';
+import { Button } from '../components/Button';
+import {
+  getCurrentUserSettings,
+  updateCurrentUserSettings,
+  type UserSettings,
+  type ThemeOption,
+  type DashboardPeriod,
+  type FirstDayOfWeek,
+} from '../services/settings';
+
+const DEFAULT_SETTINGS: UserSettings = {
+  theme: 'SYSTEM',
+  defaultDashboardPeriod: 'MONTH',
+  firstDayOfWeek: 'MONDAY',
+  showHomeSummary: true,
+};
 
 export function SettingsScreen({ navigation }: any) {
   const logout = useAuthStore((state) => state.logout);
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSettings() {
+      try {
+        setLoading(true);
+        const remoteSettings = await getCurrentUserSettings();
+        if (active) setSettings(remoteSettings);
+      } catch {
+        if (active) setSettings(DEFAULT_SETTINGS);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadSettings();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function cycleTheme() {
+    const order: ThemeOption[] = ['SYSTEM', 'LIGHT', 'DARK'];
+    const currentIndex = order.indexOf(settings.theme);
+    const nextTheme = order[(currentIndex + 1) % order.length];
+    setSettings((current) => ({ ...current, theme: nextTheme }));
+  }
+
+  function cycleDashboardPeriod() {
+    const order: DashboardPeriod[] = ['WEEK', 'MONTH', 'YEAR'];
+    const currentIndex = order.indexOf(settings.defaultDashboardPeriod);
+    const nextPeriod = order[(currentIndex + 1) % order.length];
+    setSettings((current) => ({ ...current, defaultDashboardPeriod: nextPeriod }));
+  }
+
+  function cycleFirstDayOfWeek() {
+    const order: FirstDayOfWeek[] = ['MONDAY', 'SUNDAY'];
+    const currentIndex = order.indexOf(settings.firstDayOfWeek);
+    const nextDay = order[(currentIndex + 1) % order.length];
+    setSettings((current) => ({ ...current, firstDayOfWeek: nextDay }));
+  }
+
+  async function handleSaveSettings() {
+    try {
+      setSaving(true);
+      const saved = await updateCurrentUserSettings(settings);
+      setSettings(saved);
+      Alert.alert('Sucesso', 'Configurações salvas');
+    } catch (error: any) {
+      Alert.alert('Erro', error.message || 'Erro ao salvar configurações');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function handleLogout() {
     Alert.alert('Sair', 'Deseja realmente sair da sua conta?', [
@@ -27,11 +102,8 @@ export function SettingsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.topTitle}>Configurações</Text>
+        {loading && <Text style={styles.loadingText}>Carregando preferências...</Text>}
+
         <View style={{ width: 24 }} />
       </View>
 
@@ -39,16 +111,38 @@ export function SettingsScreen({ navigation }: any) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferências</Text>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={cycleTheme} disabled={loading}>
             <Ionicons name="notifications-outline" size={22} color={colors.text} />
             <Text style={styles.menuText}>Notificações</Text>
             <Text style={styles.menuValue}>Em breve</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={cycleTheme} disabled={loading}>
             <Ionicons name="moon-outline" size={22} color={colors.text} />
             <Text style={styles.menuText}>Tema</Text>
-            <Text style={styles.menuValue}>Claro</Text>
+            <Text style={styles.menuValue}>{settings.theme}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={cycleDashboardPeriod} disabled={loading}>
+            <Ionicons name="calendar-outline" size={22} color={colors.text} />
+            <Text style={styles.menuText}>Período padrão</Text>
+            <Text style={styles.menuValue}>{settings.defaultDashboardPeriod}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={cycleFirstDayOfWeek} disabled={loading}>
+            <Ionicons name="today-outline" size={22} color={colors.text} />
+            <Text style={styles.menuText}>Primeiro dia da semana</Text>
+            <Text style={styles.menuValue}>{settings.firstDayOfWeek}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setSettings((current) => ({ ...current, showHomeSummary: !current.showHomeSummary }))}
+            disabled={loading}
+          >
+            <Ionicons name="home-outline" size={22} color={colors.text} />
+            <Text style={styles.menuText}>Resumo da Home</Text>
+            <Text style={styles.menuValue}>{settings.showHomeSummary ? 'Ativo' : 'Oculto'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -61,6 +155,8 @@ export function SettingsScreen({ navigation }: any) {
             <Text style={styles.menuValue}>1.0.0</Text>
           </View>
         </View>
+
+        <Button title="Salvar preferências" onPress={handleSaveSettings} loading={saving} />
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={colors.danger} />
@@ -95,6 +191,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+
+  loadingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 12,
   },
 
   section: {

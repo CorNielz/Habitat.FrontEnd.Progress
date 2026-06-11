@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { User } from '../types/user';
 import * as authService from '../services/auth';
+import * as userService from '../services/user';
 
 const AUTH_KEY = '@habitat_auth';
 
@@ -18,7 +19,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => void;
+  updateProfile: (data: Partial<User>) => Promise<void>;
   updatePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
 }
@@ -49,7 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: parsed.user, token: parsed.token });
       }
 
-      const currentUser = await authService.getCurrentUser();
+      const currentUser = await userService.getCurrentUser();
       await AsyncStorage.setItem(
         AUTH_KEY,
         JSON.stringify({ user: currentUser, token: parsed.token })
@@ -76,12 +77,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user: null, token: null });
   },
 
-  updateProfile: (data: Partial<User>) => {
+  updateProfile: async (data: Partial<User>) => {
     const { user } = get();
     if (!user) return;
 
-    const updatedUser = { ...user, ...data };
-    AsyncStorage.setItem(AUTH_KEY, JSON.stringify({ user: updatedUser, token: get().token }));
+    const updatedUser = await userService.updateCurrentUserProfile({
+      name: data.name ?? user.name,
+    });
+
+    await AsyncStorage.setItem(
+      AUTH_KEY,
+      JSON.stringify({ user: updatedUser, token: get().token })
+    );
     set({ user: updatedUser });
   },
 

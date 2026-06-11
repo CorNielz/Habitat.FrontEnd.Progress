@@ -29,11 +29,16 @@ export function EditProfileScreen({ navigation }: any) {
       return;
     }
 
-    setLoading(true);
-    updateProfile({ name: name.trim(), email: email.trim() });
-    setLoading(false);
-    Alert.alert('Sucesso', 'Perfil atualizado');
-    navigation.goBack();
+    try {
+      setLoading(true);
+      await updateProfile({ name: name.trim() });
+      Alert.alert('Sucesso', 'Perfil atualizado');
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Erro', error.message || 'Erro ao atualizar perfil');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleChangePassword() {
@@ -82,7 +87,12 @@ export function EditProfileScreen({ navigation }: any) {
           onChangeText={setEmail}
           keyboardType="email-address"
           autoCapitalize="none"
+          editable={false}
         />
+
+        <Text style={styles.helperText}>
+          O e-mail é exibido apenas para referência e não pode ser alterado nesta versão.
+        </Text>
 
         <Button
           title="Salvar alterações"
@@ -147,5 +157,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textSecondary,
+  },
+
+  helperText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textSecondary,
+    marginTop: -8,
   },
 });
